@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neon Bay — Open-World Crime</title>
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #0b1030;
+    font-family: "Trebuchet MS", Verdana, sans-serif; color: #fff; }
+  #game-canvas { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+  #vignette { position: fixed; inset: 0; pointer-events: none; z-index: 5;
+    background: radial-gradient(ellipse at center, transparent 62%, rgba(0,0,0,0.42) 100%); }
+  .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(8, 10, 34, 0.55); z-index: 20; }
+  .overlay.hidden { display: none; }
+  .panel { background: rgba(10, 14, 44, 0.92); border: 2px solid #ff2ea6; border-radius: 14px;
+    padding: 28px 34px; max-width: 600px; text-align: center; box-shadow: 0 0 40px #ff2ea6aa; }
+  .panel h1 { margin: 0 0 4px; font-size: 52px; letter-spacing: 4px; color: #39e6ff;
+    text-shadow: 0 0 18px #39e6ff, 0 0 42px #ff2ea6; }
+  .panel h2 { margin: 0 0 14px; font-size: 15px; color: #ffd23e; letter-spacing: 2px; }
+  .panel p { font-size: 14px; line-height: 1.5; color: #dfe6ff; }
+  .panel button { display: block; width: 280px; margin: 10px auto; padding: 12px; font-size: 17px;
+    font-weight: bold; letter-spacing: 1px; color: #08102e; background: #39e6ff; border: none;
+    border-radius: 8px; cursor: pointer; }
+  .panel button:hover { background: #ff2ea6; color: #fff; }
+  .panel button.ghost { background: transparent; color: #39e6ff; border: 2px solid #39e6ff; }
+  .controls { text-align: left; font-size: 13px; color: #b9c4ff; margin: 14px auto 0; width: 400px; }
+  .controls b { color: #ffd23e; }
+  #stats-list, #victory-stats { text-align: left; font-size: 13px; color: #dfe6ff; margin: 10px auto 0; width: 360px; }
+  #stats-list div, #victory-stats div { display: flex; justify-content: space-between; padding: 2px 0;
+    border-bottom: 1px solid #ffffff22; }
+  #stats-list b, #victory-stats b { color: #ffd23e; }
+  #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; display: none; }
+  #hud.on { display: block; }
+  #top-right { position: absolute; top: 12px; right: 14px; text-align: right; }
+  #cash { font-size: 26px; font-weight: bold; color: #7dff8a; text-shadow: 0 2px 4px #000; }
+  #clock { font-size: 16px; color: #fff; text-shadow: 0 2px 4px #000; }
+  #radio { font-size: 13px; color: #ff9ecf; text-shadow: 0 2px 4px #000; }
+  #stars { font-size: 26px; letter-spacing: 3px; text-shadow: 0 2px 4px #000; }
+  #stars .lit { color: #ffd23e; } #stars .dim { color: #555; }
+  #top-left { position: absolute; top: 12px; left: 14px; }
+  #health-wrap, #car-wrap, #nos-wrap { width: 210px; height: 16px; background: #000a;
+    border: 1px solid #fff6; border-radius: 8px; margin-bottom: 4px; }
+  #health-bar { height: 100%; width: 100%; background: linear-gradient(90deg, #ff4d6d, #ff2ea6); border-radius: 8px; }
+  #car-bar { height: 100%; width: 100%; background: linear-gradient(90deg, #39e6ff, #7dff8a); border-radius: 8px; }
+  #nos-bar { height: 100%; width: 100%; background: linear-gradient(90deg, #39a6ff, #ff2ea6); border-radius: 8px; }
+  #speed { margin-top: 6px; font-size: 15px; text-shadow: 0 2px 4px #000; }
+  #weapon, #ammo { margin-top: 2px; font-size: 15px; color: #ffe9a3; text-shadow: 0 2px 4px #000; }
+  #district { margin-top: 6px; font-size: 15px; font-weight: bold; color: #39e6ff; text-shadow: 0 2px 4px #000; }
+  #objective { position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
+    background: rgba(0,0,0,0.55); border: 1px solid #39e6ff; border-radius: 8px; padding: 8px 16px;
+    font-size: 14px; max-width: 480px; text-align: center; }
+  #objective b { color: #ffd23e; }
+  #minimap { position: absolute; right: 14px; bottom: 14px; width: 200px; height: 200px;
+    border-radius: 50%; border: 3px solid #39e6ff88; background: #0a1030cc; box-shadow: 0 0 18px #000a; }
+  #toast { position: absolute; bottom: 230px; left: 50%; transform: translateX(-50%);
+    font-size: 18px; font-weight: bold; color: #ffd23e; text-shadow: 0 2px 6px #000; text-align: center; }
+  #prompt { position: absolute; bottom: 26px; left: 50%; transform: translateX(-50%);
+    font-size: 15px; background: rgba(0,0,0,0.6); padding: 6px 14px; border-radius: 6px; }
+  #dialog { position: absolute; left: 50%; bottom: 90px; transform: translateX(-50%); width: 620px;
+    max-width: 90vw; background: rgba(10, 12, 40, 0.92); border: 2px solid #ff2ea6; border-radius: 10px;
+    padding: 14px 18px; display: none; pointer-events: auto; cursor: pointer; }
+  #dialog.on { display: block; }
+  #dialog .who { color: #ffd23e; font-weight: bold; font-size: 13px; letter-spacing: 1px; }
+  #dialog-text { font-size: 15px; line-height: 1.5; margin-top: 4px; }
+  #dialog .hint { font-size: 11px; color: #b9c4ff; margin-top: 8px; text-align: right; }
+  #shop-panel { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    width: 520px; max-width: 92vw; background: rgba(10, 14, 44, 0.96); border: 2px solid #ffd23e;
+    border-radius: 12px; padding: 18px 22px; display: none; pointer-events: auto; z-index: 30; }
+  #shop-panel.on { display: block; }
+  #shop-title { font-size: 20px; font-weight: bold; color: #ffd23e; margin-bottom: 4px; }
+  #shop-items .shop-row { display: flex; justify-content: space-between; align-items: center;
+    gap: 12px; padding: 8px 0; border-bottom: 1px solid #ffffff22; text-align: left; }
+  #shop-items .shop-row b { display: block; font-size: 15px; }
+  #shop-items .shop-row span { font-size: 12px; color: #b9c4ff; }
+  #shop-items button { width: 110px; padding: 8px; font-size: 14px; font-weight: bold;
+    color: #08102e; background: #7dff8a; border: none; border-radius: 6px; cursor: pointer; }
+  #shop-items button:disabled { background: #555; color: #999; cursor: default; }
+  #shop-close { margin-top: 12px; width: 100%; padding: 10px; font-size: 15px; font-weight: bold;
+    background: transparent; color: #39e6ff; border: 2px solid #39e6ff; border-radius: 8px; cursor: pointer; }
+  #busted-overlay, #victory-overlay { position: fixed; inset: 0; display: none; align-items: center;
+    justify-content: center; z-index: 40; pointer-events: none; }
+  #busted-overlay.on, #victory-overlay.on { display: flex; }
+  #busted-overlay { background: rgba(120, 0, 20, 0.45); }
+  #busted-text { font-size: 44px; font-weight: bold; color: #fff; text-shadow: 0 0 24px #ff2222; letter-spacing: 3px; }
+  #victory-overlay { background: rgba(8, 10, 34, 0.72); pointer-events: auto; }
+  #victory-overlay .panel { border-color: #ffd23e; box-shadow: 0 0 40px #ffd23eaa; }
+  #victory-overlay h1 { color: #ffd23e; text-shadow: 0 0 18px #ffd23e; font-size: 40px; }
+</style>
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.min.js" } }
+</script>
+</head>
+<body>
+<canvas id="game-canvas"></canvas>
+<div id="vignette"></div>
+<div id="hud">
+  <div id="top-right">
+    <div id="cash">$0</div>
+    <div id="clock">10:00 ☀️</div>
+    <div id="radio">♪ NEON FM — Synthwave</div>
+    <div id="stars"></div>
+  </div>
+  <div id="top-left">
+    <div id="health-wrap"><div id="health-bar"></div></div>
+    <div id="car-wrap"><div id="car-bar"></div></div>
+    <div id="nos-wrap"><div id="nos-bar"></div></div>
+    <div id="speed">On foot</div>
+    <div id="weapon">🔫 P9 Pistol</div>
+    <div id="ammo">Ammo 24 [1-4 switch]</div>
+    <div id="district">📍 Neon Bay</div>
+  </div>
+  <div id="objective"><b>JOB</b> Meet Dana — start your first job.</div>
+  <canvas id="minimap"></canvas>
+  <div id="toast"></div>
+  <div id="prompt"></div>
+  <div id="dialog"><div class="who">DANA REYES — FIXER</div><div id="dialog-text"></div><div class="hint">Press E / click to continue</div></div>
+  <div id="shop-panel">
+    <div id="shop-title">Shop</div>
+    <div id="shop-items"></div>
+    <button id="shop-close">CLOSE (E)</button>
+  </div>
+</div>
+<div id="busted-overlay"><div id="busted-text">BUSTED!</div></div>
+<div id="victory-overlay">
+  <div class="panel">
+    <h1>👑 KING OF THE BAY</h1>
+    <h2>YOU OWN NEON BAY</h2>
+    <p>Ten jobs. Five stars. One name the whole bay knows: <b>Rook</b>.</p>
+    <div id="victory-stats"></div>
+    <button id="btn-play-again">↻ PLAY AGAIN (NEW STORY)</button>
+    <button id="btn-free-roam" class="ghost">FREE ROAM THE BAY</button>
+  </div>
+</div>
+<div id="start-screen" class="overlay">
+  <div class="panel">
+    <h1>NEON BAY</h1>
+    <h2>AN OPEN-WORLD CRIME STORY — 10 JOBS, 8 DISTRICTS</h2>
+    <p>You are <b>Rook</b>, a driver new to Neon Bay — a sun-soaked coastal city of neon
+    towers, beach boulevards and fast cars. Take jobs from <b>Dana Reyes</b>, the bay's fixer,
+    steal what you need, buy guns at Harbor Guns, tune your ride at Neon Motors, and stay
+    ahead of the Bay PD — all the way to five stars. Ten story jobs, taxi fares, hidden
+    cash stashes, NOS boosts, a helicopter on your tail, and a day that turns to night.</p>
+    <button id="btn-start">▶ START GAME</button>
+    <button id="btn-continue" class="ghost hidden">↻ CONTINUE SAVED GAME</button>
+    <div class="controls">
+      <b>WASD</b> move / drive &nbsp; <b>Mouse</b> look &nbsp; <b>E</b> steal / exit / shop<br>
+      <b>Click</b> shoot &nbsp; <b>1-4</b> weapons &nbsp; <b>F</b> punch &nbsp; <b>Space</b> brake<br>
+      <b>Shift</b> NOS boost / sprint &nbsp; <b>Q</b> radio &nbsp; <b>M</b> restart job &nbsp; <b>P</b> pause
+    </div>
+  </div>
+</div>
+<div id="pause-screen" class="overlay hidden">
+  <div class="panel">
+    <h1 style="font-size:34px">PAUSED</h1>
+    <p>Neon Bay waits for no one. Well — right now it does.</p>
+    <div id="stats-list"></div>
+    <button id="btn-resume">▶ RESUME</button>
+    <button id="btn-save" class="ghost">💾 SAVE GAME</button>
+    <button id="btn-restart-job" class="ghost">↻ RESTART JOB</button>
+    <button id="btn-quit" class="ghost">QUIT TO TITLE</button>
+  </div>
+</div>
+<script type="module" src="./src/boot.js"></script>
+</body>
+</html>
